@@ -8,7 +8,7 @@ const preset = process.env.DEPLOY_TARGET || "node-server";
 
 export default defineConfig({
   plugins: [
-    TanStackStartVite({
+    tanstackStart({
       server: { preset },
     }),
     tailwindcss(),
