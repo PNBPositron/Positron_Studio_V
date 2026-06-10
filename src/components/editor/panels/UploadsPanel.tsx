@@ -112,7 +112,7 @@ export function UploadsPanel() {
           <optgroup label="Google Gemini">
             <option value="google/gemini-2.5-flash-image">Nano Banana (fast)</option>
             <option value="google/gemini-3.1-flash-image-preview">Nano Banana 2</option>
-            <option value="google/gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
+            <option value="google/gemini-3-pro-image">Gemini 3 Pro Image</option>
           </optgroup>
         </select>
         <div className="grid grid-cols-2 gap-2">
