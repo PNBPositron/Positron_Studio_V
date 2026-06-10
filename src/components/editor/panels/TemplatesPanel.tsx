@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Sparkles, Loader2, ImagePlus, X, Heart, Grid3x3 } from "lucide-react";
+import { Sparkles, Loader2, ImagePlus, X, Heart, Grid3x3, TrendingUp, Flame } from "lucide-react";
 import {
   useEditor,
   newText,
@@ -17,6 +17,7 @@ import { generateAiTemplate, type AiElementInput, type AiStyle } from "@/lib/ai-
 import {
   listPublicTemplates,
   listTemplateLikeCounts,
+  listRecentLikeCounts,
   listMyLikedTemplateIds,
   likeTemplate,
   unlikeTemplate,
@@ -93,10 +94,11 @@ export function TemplatesPanel() {
   const [community, setCommunity] = useState<PublicTemplate[]>([]);
   const [communityLoading, setCommunityLoading] = useState(false);
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  const [recentCounts, setRecentCounts] = useState<Record<string, number>>({});
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const { user } = useAuth();
   const [showAll, setShowAll] = useState(false);
-  const [sortBy, setSortBy] = useState<"likes" | "recent">("likes");
+  const [sortBy, setSortBy] = useState<"likes" | "recent" | "trending">("trending");
 
   useEffect(() => {
     setCommunityLoading(true);
@@ -104,11 +106,13 @@ export function TemplatesPanel() {
       .then(async (tpls) => {
         setCommunity(tpls);
         const ids = tpls.map((t) => t.id);
-        const [counts, mine] = await Promise.all([
+        const [counts, recent, mine] = await Promise.all([
           listTemplateLikeCounts(ids),
+          listRecentLikeCounts(7).catch(() => ({} as Record<string, number>)),
           listMyLikedTemplateIds().catch(() => new Set<string>()),
         ]);
         setLikeCounts(counts);
+        setRecentCounts(recent);
         setLikedIds(mine);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
@@ -360,10 +364,23 @@ export function TemplatesPanel() {
 function sortTemplates(
   tpls: PublicTemplate[],
   likes: Record<string, number>,
-  sortBy: "likes" | "recent",
+  sortBy: "likes" | "recent" | "trending",
+  recent?: Record<string, number>,
 ): PublicTemplate[] {
   const arr = [...tpls];
-  if (sortBy === "likes") {
+  if (sortBy === "trending") {
+    // Rank by a velocity score: recent likes weighted heavily, with a small
+    // freshness boost for newly-published templates and all-time likes as a
+    // tiebreaker.
+    const now = Date.now();
+    const score = (t: PublicTemplate) => {
+      const recentLikes = recent?.[t.id] ?? 0;
+      const ageDays = Math.max(0, (now - +new Date(t.created_at)) / 86_400_000);
+      const freshness = ageDays < 14 ? (14 - ageDays) / 14 : 0;
+      return recentLikes * 10 + freshness * 3 + (likes[t.id] ?? 0);
+    };
+    arr.sort((a, b) => score(b) - score(a));
+  } else if (sortBy === "likes") {
     arr.sort((a, b) => (likes[b.id] ?? 0) - (likes[a.id] ?? 0));
   } else {
     arr.sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));

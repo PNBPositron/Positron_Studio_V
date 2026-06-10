@@ -1,4 +1,39 @@
 import { createServerFn } from "@tanstack/react-start";
+import { generateText, generateImage } from "ai";
+import { gateway } from "@ai-sdk/gateway";
+
+// Models routed through the Vercel AI Gateway (zero-config on Vercel).
+const DECK_MODEL = "google/gemini-3.5-flash";
+const FAST_MODEL = "google/gemini-3.1-flash-lite";
+
+type ChatPart =
+  | { type: "text"; text: string }
+  | { type: "image"; image: string };
+
+// Single helper around the gateway for JSON-returning text generations.
+async function generateJsonText(args: {
+  model: string;
+  system: string;
+  user: string | ChatPart[];
+}): Promise<string> {
+  try {
+    const { text } = await generateText({
+      model: args.model,
+      system: args.system,
+      messages: [{ role: "user", content: args.user as never }],
+    });
+    if (!text?.trim()) throw new Error("Empty AI response");
+    return text;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/rate.?limit|429/i.test(msg)) throw new Error("Rate limit hit. Try again in a moment.");
+    if (/quota|credit|402|payment/i.test(msg)) throw new Error("AI credits exhausted.");
+    if (/api.?key|unauthor|401|403/i.test(msg)) {
+      throw new Error("AI Gateway not configured. Set AI_GATEWAY_API_KEY in your environment.");
+    }
+    throw new Error(`AI generation failed: ${msg}`);
+  }
+}
 
 // Robustly extract a JSON object from a model response that may include
 // markdown fences, prose, or multiple back-to-back objects.
@@ -203,44 +238,24 @@ export const generateAiTemplate = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data }): Promise<AiDeck> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
-
-    const userContent: Array<Record<string, unknown>> = [
+    const userContent: ChatPart[] = [
       { type: "text", text: `Design concept: ${data.prompt || "(use the attached image as the brief)"}\n\nProduce exactly ${data.slideCount} slides.` },
     ];
     if (data.imageDataUrl) {
-      userContent.push({ type: "image_url", image_url: { url: data.imageDataUrl } });
+      userContent.push({ type: "image", image: data.imageDataUrl });
     }
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: buildSystem(data.width, data.height, data.style, !!data.imageDataUrl) },
-          { role: "user", content: userContent },
-        ],
-        response_format: { type: "json_object" },
-      }),
+    const content = await generateJsonText({
+      model: DECK_MODEL,
+      system: buildSystem(data.width, data.height, data.style, !!data.imageDataUrl),
+      user: userContent,
     });
-
-    if (res.status === 429) throw new Error("Rate limit hit. Try again in a moment.");
-    if (res.status === 402) throw new Error("AI credits exhausted. Add credits in Settings → Workspace → Usage.");
-    if (!res.ok) throw new Error(`AI gateway error ${res.status}: ${await res.text()}`);
-
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const content = json.choices?.[0]?.message?.content;
-    if (!content) throw new Error("Empty AI response");
 
     let parsed: AiDeck | AiTemplate;
     try {
-      parsed = JSON.parse(content);
+      parsed = parseLooseJson<AiDeck | AiTemplate>(content);
     } catch {
-      const match = content.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error("AI returned invalid JSON");
-      parsed = JSON.parse(match[0]);
+      throw new Error("AI returned invalid JSON");
     }
     // Normalize: accept either { pages: [...] } or legacy { bg, elements }
     let pages: AiPage[];
@@ -264,33 +279,13 @@ export const suggestIcons = createServerFn({ method: "POST" })
     return { prompt: data.prompt.slice(0, 300), count };
   })
   .handler(async ({ data }): Promise<{ icons: string[] }> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        messages: [
-          {
-            role: "system",
-            content: `Return ${data.count} lucide-react icon names (PascalCase) that best fit the user's theme. Use only real lucide icons. Return JSON: { "icons": string[] }. No commentary.`,
-          },
-          { role: "user", content: `Theme: ${data.prompt}` },
-        ],
-        response_format: { type: "json_object" },
-      }),
+    const content = await generateJsonText({
+      model: FAST_MODEL,
+      system: `Return ${data.count} lucide-react icon names (PascalCase) that best fit the user's theme. Use only real lucide icons. Return JSON: { "icons": string[] }. No commentary.`,
+      user: `Theme: ${data.prompt}`,
     });
-    if (res.status === 429) throw new Error("Rate limit hit. Try again in a moment.");
-    if (res.status === 402) throw new Error("AI credits exhausted.");
-    if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const content = json.choices?.[0]?.message?.content ?? "";
     let parsed: { icons?: unknown };
-    try { parsed = JSON.parse(content); } catch {
-      const m = content.match(/\{[\s\S]*\}/);
-      parsed = m ? JSON.parse(m[0]) : {};
-    }
+    try { parsed = parseLooseJson<{ icons?: unknown }>(content); } catch { parsed = {}; }
     const icons = Array.isArray(parsed.icons)
       ? (parsed.icons as unknown[]).filter((n): n is string => typeof n === "string")
       : [];
@@ -326,35 +321,19 @@ export const generate3DScene = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data }): Promise<Ai3DScene> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
     const sys = `Design a 3D composition on a ${data.width}×${data.height}px canvas using ONLY spheres (planets, orbs, bubbles).
 Compose 3-7 spheres, varied sizes (80-700px), thoughtful color harmony.
 Coordinates absolute, must stay inside bounds.
 Return JSON only: { "bg": "#hex", "models": Array<{ "shape":"sphere", "x", "y", "width", "height", "color", "spinSpeed"?, "tiltX"?, "tiltY"? }> }.
 spinSpeed: 0-30 seconds (0 = static). Always set "shape" to "sphere".`;
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: `Theme: ${data.prompt}` },
-        ],
-        response_format: { type: "json_object" },
-      }),
+    const content = await generateJsonText({
+      model: FAST_MODEL,
+      system: sys,
+      user: `Theme: ${data.prompt}`,
     });
-    if (res.status === 429) throw new Error("Rate limit hit.");
-    if (res.status === 402) throw new Error("AI credits exhausted.");
-    if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const content = json.choices?.[0]?.message?.content ?? "";
     let parsed: Ai3DScene;
-    try { parsed = JSON.parse(content); } catch {
-      const m = content.match(/\{[\s\S]*\}/);
-      if (!m) throw new Error("AI returned invalid JSON");
-      parsed = JSON.parse(m[0]);
+    try { parsed = parseLooseJson<Ai3DScene>(content); } catch {
+      throw new Error("AI returned invalid JSON");
     }
     if (!Array.isArray(parsed.models)) throw new Error("Missing models array");
     // force sphere
@@ -383,9 +362,6 @@ export const editCurrentSlide = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data }): Promise<AiPage> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
-
     const sys = `You are an elite graphic designer EDITING an existing slide on a ${data.width}×${data.height}px canvas.
 You will receive the CURRENT slide as JSON and a user instruction. Apply the instruction and return the FULL updated slide.
 
@@ -399,23 +375,11 @@ Rules:
 Return ONLY valid JSON, no commentary:
 { "bg": "#hex", "elements": Array<element> }`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: `Current slide:\n${JSON.stringify(data.page)}\n\nInstruction: ${data.prompt}` },
-        ],
-        response_format: { type: "json_object" },
-      }),
+    const content = await generateJsonText({
+      model: DECK_MODEL,
+      system: sys,
+      user: `Current slide:\n${JSON.stringify(data.page)}\n\nInstruction: ${data.prompt}`,
     });
-    if (res.status === 429) throw new Error("Rate limit hit. Try again in a moment.");
-    if (res.status === 402) throw new Error("AI credits exhausted. Add credits in Settings → Workspace → Usage.");
-    if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const content = json.choices?.[0]?.message?.content ?? "";
     const parsed = parseLooseJson<AiPage>(content);
     if (!parsed || !Array.isArray(parsed.elements)) throw new Error("AI response missing elements");
     return { bg: parsed.bg ?? data.page.bg, elements: parsed.elements };
@@ -437,7 +401,7 @@ export const generateAiAsset = createServerFn({ method: "POST" })
       "openai/gpt-image-1-mini",
       "google/gemini-2.5-flash-image",
       "google/gemini-3.1-flash-image-preview",
-      "google/gemini-3-pro-image-preview",
+      "google/gemini-3-pro-image",
     ];
     const model = data.model && allowedModels.includes(data.model) ? data.model : "openai/gpt-image-2";
     const quality: "low" | "medium" | "high" =
@@ -445,35 +409,23 @@ export const generateAiAsset = createServerFn({ method: "POST" })
     return { prompt: data.prompt.slice(0, 1000), size, model, quality };
   })
   .handler(async ({ data }): Promise<{ dataUrl: string }> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
-    const isGemini = data.model.startsWith("google/");
-    const body = isGemini
-      ? {
-          model: data.model,
-          messages: [{ role: "user", content: data.prompt }],
-          modalities: ["image", "text"],
-        }
-      : {
-          model: data.model,
-          prompt: data.prompt,
-          size: data.size,
-          quality: data.quality,
-          n: 1,
-        };
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (res.status === 429) throw new Error("Rate limit hit. Try again shortly.");
-    if (res.status === 402) throw new Error("AI credits exhausted.");
-    if (!res.ok) throw new Error(`AI gateway error ${res.status}: ${await res.text()}`);
-    const json = (await res.json()) as { data?: Array<{ b64_json?: string; url?: string }> };
-    const first = json.data?.[0];
-    if (first?.b64_json) return { dataUrl: `data:image/png;base64,${first.b64_json}` };
-    if (first?.url) return { dataUrl: first.url };
-    throw new Error("AI returned no image");
+    try {
+      const { image } = await generateImage({
+        model: gateway.imageModel(data.model),
+        prompt: data.prompt,
+        size: data.size as `${number}x${number}`,
+      });
+      const mediaType = image.mediaType ?? "image/png";
+      return { dataUrl: `data:${mediaType};base64,${image.base64}` };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/rate.?limit|429/i.test(msg)) throw new Error("Rate limit hit. Try again shortly.");
+      if (/quota|credit|402|payment/i.test(msg)) throw new Error("AI credits exhausted.");
+      if (/api.?key|unauthor|401|403/i.test(msg)) {
+        throw new Error("AI Gateway not configured. Set AI_GATEWAY_API_KEY in your environment.");
+      }
+      throw new Error(`Image generation failed: ${msg}`);
+    }
   });
 
 // ---------------- Stock photo search (Openverse) ----------------

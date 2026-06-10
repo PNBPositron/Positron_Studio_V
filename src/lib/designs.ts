@@ -132,6 +132,29 @@ export async function listTemplateLikeCounts(
   return counts;
 }
 
+/* ---------------- Trending ---------------- */
+
+/**
+ * Returns a map of templateId -> number of likes received within the last
+ * `days` days. Used to rank "trending" templates by recent engagement
+ * velocity rather than all-time popularity.
+ */
+export async function listRecentLikeCounts(
+  days = 7,
+): Promise<Record<string, number>> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("template_likes")
+    .select("template_id, created_at")
+    .gte("created_at", since);
+  if (error) throw error;
+  const counts: Record<string, number> = {};
+  for (const row of (data ?? []) as Array<{ template_id: string }>) {
+    counts[row.template_id] = (counts[row.template_id] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export async function listMyLikedTemplateIds(): Promise<Set<string>> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return new Set();
