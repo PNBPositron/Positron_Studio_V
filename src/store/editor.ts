@@ -114,6 +114,29 @@ export type Model3DElement = ElementBase & {
   tiltY: number; // deg
 };
 
+export type ComponentStyle = "cyber" | "glass" | "neobrutalist" | "sketch" | "xp";
+export const COMPONENT_STYLES: ComponentStyle[] = ["cyber", "glass", "neobrutalist", "sketch", "xp"];
+
+export type UIKind =
+  | "card"
+  | "button"
+  | "input"
+  | "toggle"
+  | "badge"
+  | "progress"
+  | "checkbox"
+  | "alert";
+export type UIElement = ElementBase & {
+  type: "ui";
+  ui: UIKind;
+  style: ComponentStyle;
+  title?: string;
+  text?: string;
+  placeholder?: string;
+  value?: number; // progress 0-100
+  checked?: boolean; // toggle / checkbox
+};
+
 export type QuizOption = { id: string; text: string };
 export type QuizElement = ElementBase & {
   type: "quiz";
@@ -123,6 +146,7 @@ export type QuizElement = ElementBase & {
   bgColor: string;
   fgColor: string;
   accentColor: string;
+  style?: ComponentStyle;
 };
 
 export type ChartKind = "bar" | "line" | "area" | "pie" | "donut";
@@ -137,6 +161,7 @@ export type ChartElement = ElementBase & {
   title?: string;
   showValues?: boolean;
   showAxes?: boolean;
+  style?: ComponentStyle;
 };
 
 export type ButtonAction = "link" | "next-slide" | "prev-slide" | "first-slide" | "last-slide";
@@ -154,6 +179,7 @@ export type ButtonElement = ElementBase & {
   action: ButtonAction;
   href?: string;
   shadow?: ElementShadow;
+  style?: ComponentStyle;
 };
 
 export type AnyElement =
@@ -164,7 +190,8 @@ export type AnyElement =
   | Model3DElement
   | QuizElement
   | ChartElement
-  | ButtonElement;
+  | ButtonElement
+  | UIElement;
 
 export type Page = {
   id: string;
@@ -190,7 +217,7 @@ export const CANVAS_PRESETS = [
   { name: "Slide 16:9", w: 1920, h: 1080 },
 ] as const;
 
-type Tool = "templates" | "text" | "shapes" | "uploads" | "design" | "icons" | "ai";
+type Tool = "templates" | "text" | "shapes" | "components" | "uploads" | "design" | "icons" | "ai";
 
 type HistorySnap = { pages: Page[]; currentIndex: number };
 
@@ -401,6 +428,35 @@ export const newButton = (overrides: Partial<ButtonElement> = {}): ButtonElement
   fontFamily: "Archivo Black",
   fontWeight: 900,
   action: "next-slide",
+  ...overrides,
+});
+
+const UI_DEFAULTS: Record<UIKind, Partial<UIElement>> = {
+  card: { width: 420, height: 260, title: "Card title", text: "Supporting copy goes here. Edit this text in the properties panel." },
+  button: { width: 260, height: 84, text: "Button" },
+  input: { width: 420, height: 110, title: "Email", placeholder: "you@example.com" },
+  toggle: { width: 320, height: 84, text: "Enable notifications", checked: true },
+  badge: { width: 180, height: 64, text: "New" },
+  progress: { width: 420, height: 96, title: "Uploading", value: 68 },
+  checkbox: { width: 360, height: 72, text: "I agree to the terms", checked: true },
+  alert: { width: 460, height: 150, title: "Heads up", text: "This is an important alert message." },
+};
+
+export const newUI = (
+  ui: UIKind,
+  style: ComponentStyle = "cyber",
+  overrides: Partial<UIElement> = {},
+): UIElement => ({
+  id: uid(),
+  type: "ui",
+  x: 240,
+  y: 240,
+  width: 400,
+  height: 200,
+  rotation: 0,
+  ui,
+  style,
+  ...UI_DEFAULTS[ui],
   ...overrides,
 });
 

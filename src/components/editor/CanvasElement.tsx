@@ -2,6 +2,8 @@ import { useRef, useState, useEffect } from "react";
 import { useEditor, type AnyElement, type ShapeElement, type QuizElement, type ChartElement, type ButtonElement, type ElementShadow, DEFAULT_FILTERS, type ImageFilters } from "@/store/editor";
 import { ShapeRender } from "./ShapeRender";
 import { Model3DRender } from "./Model3DRender";
+import { UIRender } from "./UIRender";
+import { styleTokens, frameStyle } from "@/lib/componentStyles";
 import * as LucideIcons from "lucide-react";
 import { HelpCircle, Check, X as XIcon } from "lucide-react";
 
@@ -310,6 +312,7 @@ export function CanvasElement({ element, scale }: { element: AnyElement; scale: 
       })()}
 
       {element.type === "chart" && <ChartRender element={element} />}
+      {element.type === "ui" && <UIRender element={element} />}
       {element.type === "button" && (() => {
         const presenting = useEditor.getState().presenting;
         return <ButtonRender element={element} interactive={presenting} />;
@@ -344,21 +347,30 @@ function QuizRender({ element, interactive }: { element: QuizElement; interactiv
   useEffect(() => {
     if (!interactive) setPicked(null);
   }, [interactive, element.id]);
+  const t = element.style ? styleTokens(element.style) : null;
+  const bgColor = t ? t.bg : element.bgColor;
+  const fgColor = t ? t.fg : element.fgColor;
+  const accentColor = t ? t.accent : element.accentColor;
+  const idleSurface = t ? t.surface : "rgba(255,255,255,0.06)";
+  const idleBorder = t ? t.innerBorder : "2px solid rgba(255,255,255,0.18)";
   return (
     <div
       onMouseDown={(e) => interactive && e.stopPropagation()}
       style={{
         width: "100%",
         height: "100%",
-        background: element.bgColor,
-        color: element.fgColor,
+        background: bgColor,
+        color: fgColor,
         padding: "5%",
         display: "flex",
         flexDirection: "column",
         gap: "4%",
-        border: `3px solid ${element.accentColor}`,
-        borderRadius: 18,
-        fontFamily: "Inter, system-ui, sans-serif",
+        border: t ? t.border : `3px solid ${accentColor}`,
+        borderRadius: t ? (t.radiusCss ?? t.radius) : 18,
+        boxShadow: t ? t.shadow : undefined,
+        backdropFilter: t?.backdrop,
+        WebkitBackdropFilter: t?.backdrop,
+        fontFamily: t ? t.fontFamily : "Inter, system-ui, sans-serif",
         overflow: "hidden",
       }}
     >
@@ -371,12 +383,12 @@ function QuizRender({ element, interactive }: { element: QuizElement; interactiv
           const isCorrect = opt.id === element.correctId;
           const showResult = picked !== null;
           const bg = !showResult
-            ? "rgba(255,255,255,0.06)"
+            ? idleSurface
             : isCorrect
               ? "#16a34a"
               : isPicked
                 ? "#dc2626"
-                : "rgba(255,255,255,0.04)";
+                : idleSurface;
           return (
             <button
               key={opt.id}
@@ -384,9 +396,9 @@ function QuizRender({ element, interactive }: { element: QuizElement; interactiv
               onClick={() => interactive && setPicked(opt.id)}
               style={{
                 background: bg,
-                color: element.fgColor,
-                border: `2px solid ${isPicked || (showResult && isCorrect) ? element.accentColor : "rgba(255,255,255,0.18)"}`,
-                borderRadius: 12,
+                color: showResult && (isCorrect || isPicked) ? "#ffffff" : fgColor,
+                border: isPicked || (showResult && isCorrect) ? `2px solid ${accentColor}` : idleBorder,
+                borderRadius: t ? Math.min(12, t.radius) : 12,
                 padding: "0 16px",
                 fontSize: "max(16px, 3.2%)",
                 fontWeight: 600,
@@ -411,7 +423,11 @@ function QuizRender({ element, interactive }: { element: QuizElement; interactiv
 }
 
 function ChartRender({ element }: { element: ChartElement }) {
-  const { chart, data, colors, bgColor, fgColor, title, showValues, showAxes } = element;
+  const t = element.style ? styleTokens(element.style) : null;
+  const { chart, data, title, showValues, showAxes } = element;
+  const colors = t ? t.palette : element.colors;
+  const bgColor = t ? t.bg : element.bgColor;
+  const fgColor = t ? t.fg : element.fgColor;
   const W = 400, H = 300;
   const padL = 50, padR = 20, padT = title ? 40 : 20, padB = 40;
   const plotW = W - padL - padR;
@@ -497,8 +513,11 @@ function ChartRender({ element }: { element: ChartElement }) {
     });
   };
 
+  const containerStyle: React.CSSProperties = t
+    ? { ...frameStyle(t), width: "100%", height: "100%", overflow: "hidden", padding: "3%" }
+    : { width: "100%", height: "100%", background: bgColor, borderRadius: 12, overflow: "hidden", padding: "2%" };
   return (
-    <div style={{ width: "100%", height: "100%", background: bgColor, borderRadius: 12, overflow: "hidden", padding: "2%" }}>
+    <div style={containerStyle}>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" width="100%" height="100%">
         {title && (
           <text x={padL} y={22} fill={fgColor} fontSize="16" fontWeight={800} fontFamily="Inter, sans-serif">{title}</text>
@@ -539,6 +558,23 @@ function ButtonRender({ element, interactive }: { element: ButtonElement; intera
       case "link": if (element.href) window.open(element.href, "_blank", "noopener,noreferrer"); break;
     }
   };
+  const styled = element.style
+    ? (() => {
+        const t = styleTokens(element.style);
+        return {
+          background: t.accent,
+          color: t.accentFg,
+          border: t.border,
+          borderRadius: t.radiusCss ?? t.radius,
+          fontFamily: t.fontFamily,
+          boxShadow: t.shadow,
+          textTransform: t.name === "cyber" ? ("uppercase" as const) : ("none" as const),
+          letterSpacing: t.name === "cyber" ? "0.08em" : "0",
+          backdropFilter: t.backdrop,
+          WebkitBackdropFilter: t.backdrop,
+        };
+      })()
+    : null;
   return (
     <button
       onMouseDown={(e) => interactive && e.stopPropagation()}
@@ -559,6 +595,7 @@ function ButtonRender({ element, interactive }: { element: ButtonElement; intera
           ? `${element.shadow.x}px ${element.shadow.y}px ${element.shadow.blur}px ${element.shadow.color}`
           : undefined,
         transition: "transform 0.1s",
+        ...(styled ?? {}),
       }}
     >
       {element.text}

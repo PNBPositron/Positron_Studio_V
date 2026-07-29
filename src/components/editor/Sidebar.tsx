@@ -1,8 +1,9 @@
 import { useEditor } from "@/store/editor";
-import { LayoutTemplate, Type, Shapes, Upload, SlidersHorizontal, Sparkles, Bot } from "lucide-react";
+import { LayoutTemplate, Type, Shapes, Blocks, Upload, SlidersHorizontal, Sparkles, Bot } from "lucide-react";
 import { TemplatesPanel } from "./panels/TemplatesPanel";
 import { TextPanel } from "./panels/TextPanel";
 import { ShapesPanel } from "./panels/ShapesPanel";
+import { ComponentsPanel } from "./panels/ComponentsPanel";
 import { UploadsPanel } from "./panels/UploadsPanel";
 import { DesignPanel } from "./panels/DesignPanel";
 import { IconsPanel } from "./panels/IconsPanel";
@@ -13,6 +14,7 @@ const TOOLS = [
   { id: "ai", label: "AI Edit", icon: Bot },
   { id: "text", label: "Text", icon: Type },
   { id: "shapes", label: "Shapes", icon: Shapes },
+  { id: "components", label: "Components", icon: Blocks },
   { id: "icons", label: "Icons", icon: Sparkles },
   { id: "uploads", label: "Uploads", icon: Upload },
   { id: "design", label: "Design", icon: SlidersHorizontal },
@@ -50,6 +52,7 @@ export function Sidebar() {
         {tool === "ai" && <AiChatPanel />}
         {tool === "text" && <TextPanel />}
         {tool === "shapes" && <ShapesPanel />}
+        {tool === "components" && <ComponentsPanel />}
         {tool === "icons" && <IconsPanel />}
         {tool === "uploads" && <UploadsPanel />}
         {tool === "design" && <DesignPanel />}
