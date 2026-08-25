@@ -1,5 +1,6 @@
-import { useEditor, DEFAULT_FILTERS, type ImageFilters, type ElementShadow, type ShapeGradient, type QuizElement, type QuizOption, type ChartElement, type ButtonElement, type ChartKind, type ButtonAction } from "@/store/editor";
+import { useEditor, DEFAULT_FILTERS, COMPONENT_STYLES, type ImageFilters, type ElementShadow, type ShapeGradient, type QuizElement, type QuizOption, type ChartElement, type ButtonElement, type UIElement, type ChartKind, type ButtonAction, type ComponentStyle } from "@/store/editor";
 import { Copy, Trash2, ArrowUp, ArrowDown, Layers, RotateCcw, Plus, Check } from "lucide-react";
+import { styleTokens } from "@/lib/componentStyles";
 
 const SWATCHES = [
   "#7df9ff", "#00d9ff", "#0ea5e9", "#4d7cff", "#1f3fb8",
@@ -34,7 +35,15 @@ export function PropertiesPanel() {
         </div>
       </div>
 
-      <div className="space-y-4 p-4">
+        <div className="space-y-4 p-4">
+        {(el.type === "ui" || el.type === "quiz" || el.type === "chart" || el.type === "button") && (
+          <StylePicker
+            value={el.style ?? "cyber"}
+            onChange={(style) => update(el.id, { style } as Partial<typeof el>)}
+          />
+        )}
+
+        {el.type === "ui" && <UIEditor element={el} onChange={(patch) => update(el.id, patch)} />}
         {el.type === "text" && (
           <>
             <Field label="Text">
@@ -537,6 +546,40 @@ function GradientEditor({
           </Field>
         </>
       )}
+    </>
+  );
+}
+
+function StylePicker({ value, onChange }: { value: ComponentStyle; onChange: (value: ComponentStyle) => void }) {
+  return (
+    <Field label="Component style">
+      <div className="grid grid-cols-2 gap-1.5">
+        {COMPONENT_STYLES.map((style) => {
+          const t = styleTokens(style);
+          return (
+            <button
+              key={style}
+              onClick={() => onChange(style)}
+              className={`brutal-border-2 px-2 py-1.5 font-mono text-[10px] uppercase ${value === style ? "bg-blue text-ink border-teal" : "bg-surface text-teal hover:border-teal"}`}
+              title={t.label}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+    </Field>
+  );
+}
+
+function UIEditor({ element, onChange }: { element: UIElement; onChange: (patch: Partial<UIElement>) => void }) {
+  return (
+    <>
+      {element.title !== undefined && <Field label="Title"><input value={element.title} onChange={(e) => onChange({ title: e.target.value })} className="brutal-border-2 w-full bg-surface px-2 py-1.5 font-mono text-xs text-teal" /></Field>}
+      {element.text !== undefined && <Field label="Text"><textarea value={element.text} onChange={(e) => onChange({ text: e.target.value })} rows={3} className="brutal-border-2 w-full bg-surface p-2 font-mono text-xs text-teal" /></Field>}
+      {element.placeholder !== undefined && <Field label="Placeholder"><input value={element.placeholder} onChange={(e) => onChange({ placeholder: e.target.value })} className="brutal-border-2 w-full bg-surface px-2 py-1.5 font-mono text-xs text-teal" /></Field>}
+      {element.value !== undefined && <Field label="Progress"><input type="range" min={0} max={100} value={element.value} onChange={(e) => onChange({ value: +e.target.value })} className="w-full accent-teal" /><div className="font-mono text-[11px] text-teal/70">{element.value}%</div></Field>}
+      {element.checked !== undefined && <Field label="State"><button onClick={() => onChange({ checked: !element.checked })} className={`brutal-border-2 w-full py-1.5 font-mono text-[10px] uppercase ${element.checked ? "bg-blue text-ink border-teal" : "bg-surface text-teal"}`}>{element.checked ? "On" : "Off"}</button></Field>}
     </>
   );
 }
