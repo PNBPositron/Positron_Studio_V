@@ -44,8 +44,8 @@
   --color-surface-2: var(--surface-2);
   --color-grid: var(--grid);
 
-  --font-display: "Orbitron", "Archivo Black", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-display: "IBM Plex Sans", "Helvetica Neue", sans-serif;
+  --font-mono: "IBM Plex Mono", "Roboto Mono", monospace;
   --shadow-brutal: 0 0 0 2px var(--teal), 6px 6px 0 0 var(--blue-deep);
   --shadow-brutal-sm: 0 0 0 1px var(--teal), 3px 3px 0 0 var(--blue-deep);
   --shadow-brutal-lg: 0 0 0 2px var(--teal), 10px 10px 0 0 var(--blue-deep);
@@ -56,106 +56,81 @@
 :root {
   --radius: 0px;
 
-  /* Cyberpunk palette */
-  --ink: oklch(0.08 0.02 240);
-  --paper: oklch(0.12 0.03 240);
-  --surface: oklch(0.16 0.04 245);
-  --surface-2: oklch(0.21 0.05 250);
-  --grid: oklch(0.28 0.08 220);
+  /* IBM Carbon palette */
+  --ink: #161616;
+  --paper: #f4f4f4;
+  --surface: #ffffff;
+  --surface-2: #e0e0e0;
+  --grid: #c6c6c6;
 
-  --teal: oklch(0.86 0.16 195);
-  --teal-deep: oklch(0.62 0.16 195);
-  --blue: oklch(0.66 0.22 255);
-  --blue-deep: oklch(0.42 0.24 265);
+  --teal: #0f62fe;
+  --teal-deep: #0043ce;
+  --blue: #4589ff;
+  --blue-deep: #002d9c;
 
   --background: var(--paper);
-  --foreground: var(--teal);
+  --foreground: var(--ink);
   --card: var(--surface);
-  --card-foreground: var(--teal);
+  --card-foreground: var(--ink);
   --popover: var(--surface);
-  --popover-foreground: var(--teal);
-  --primary: var(--blue);
-  --primary-foreground: oklch(0.08 0.02 240);
-  --secondary: var(--teal);
-  --secondary-foreground: var(--ink);
+  --popover-foreground: var(--ink);
+  --primary: var(--teal);
+  --primary-foreground: #ffffff;
+  --secondary: #525252;
+  --secondary-foreground: #ffffff;
   --muted: var(--surface-2);
-  --muted-foreground: oklch(0.62 0.07 220);
-  --accent: var(--teal);
+  --muted-foreground: #525252;
+  --accent: #d0e2ff;
   --accent-foreground: var(--ink);
-  --destructive: oklch(0.65 0.27 18);
-  --destructive-foreground: oklch(1 0 0);
-  --border: var(--teal);
-  --input: var(--teal-deep);
-  --ring: var(--blue);
+  --destructive: #da1e28;
+  --destructive-foreground: #ffffff;
+  --border: #8d8d8d;
+  --input: #ffffff;
+  --ring: var(--teal);
 }
 
 @layer base {
   * {
-    border-color: color-mix(in oklab, var(--teal) 30%, transparent);
+    border-color: var(--border);
   }
   html, body {
-    background-color: var(--ink);
-    color: var(--teal);
-    font-family: "JetBrains Mono", "Inter", system-ui, monospace;
-    background-image:
-      linear-gradient(color-mix(in oklab, var(--teal) 12%, transparent) 1px, transparent 1px),
-      linear-gradient(90deg, color-mix(in oklab, var(--blue) 12%, transparent) 1px, transparent 1px),
-      radial-gradient(ellipse at 20% 10%, color-mix(in oklab, var(--blue) 22%, transparent), transparent 60%),
-      radial-gradient(ellipse at 80% 90%, color-mix(in oklab, var(--teal) 18%, transparent), transparent 60%);
-    background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
   }
   h1, h2, h3, h4 {
     font-family: var(--font-display);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
   }
   ::selection {
-    background: var(--teal);
+    background: var(--accent);
     color: var(--ink);
   }
 }
 
 @layer utilities {
   .brutal-border { border: 2px solid var(--teal); }
-  .brutal-border-2 { border: 1px solid color-mix(in oklab, var(--teal) 60%, transparent); }
-  .brutal-shadow { box-shadow: 0 0 0 2px var(--teal), 6px 6px 0 0 var(--blue-deep); }
-  .brutal-shadow-sm { box-shadow: 0 0 0 1px var(--teal), 3px 3px 0 0 var(--blue-deep); }
-  .brutal-shadow-lg { box-shadow: 0 0 0 2px var(--teal), 12px 12px 0 0 var(--blue-deep), var(--shadow-glow-blue); }
-  .glow-teal { box-shadow: var(--shadow-glow-teal); }
-  .glow-blue { box-shadow: var(--shadow-glow-blue); }
-  .text-glow {
-    text-shadow:
-      0 0 6px color-mix(in oklab, var(--teal) 60%, transparent),
-      0 0 18px color-mix(in oklab, var(--teal) 30%, transparent);
-  }
-  .text-glow-blue {
-    text-shadow:
-      0 0 6px color-mix(in oklab, var(--blue) 70%, transparent),
-      0 0 18px color-mix(in oklab, var(--blue) 35%, transparent);
-  }
+  .brutal-border-2 { border: 1px solid var(--border); }
+  .brutal-shadow { box-shadow: 0 2px 6px rgb(0 0 0 / 18%); }
+  .brutal-shadow-sm { box-shadow: 0 1px 3px rgb(0 0 0 / 16%); }
+  .brutal-shadow-lg { box-shadow: 0 4px 12px rgb(0 0 0 / 22%); }
+  .glow-teal, .glow-blue { box-shadow: 0 0 0 2px var(--teal); }
+  .text-glow, .text-glow-blue { text-shadow: none; }
   .brutal-press {
-    transition: transform 90ms ease, box-shadow 90ms ease, filter 120ms ease;
+    transition: background-color 120ms ease, box-shadow 120ms ease;
   }
   .brutal-press:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: 0 0 0 2px var(--teal), 8px 8px 0 0 var(--blue-deep), var(--shadow-glow-teal);
-    filter: brightness(1.05);
+    box-shadow: 0 0 0 2px var(--teal);
+    filter: brightness(1.04);
   }
   .brutal-press:active {
-    transform: translate(2px, 2px);
-    box-shadow: 0 0 0 2px var(--teal), 2px 2px 0 0 var(--blue-deep);
+    box-shadow: 0 0 0 1px var(--teal);
   }
-  .scanlines {
-    background-image: repeating-linear-gradient(
-      to bottom,
-      transparent 0,
-      transparent 2px,
-      color-mix(in oklab, var(--teal) 6%, transparent) 2px,
-      color-mix(in oklab, var(--teal) 6%, transparent) 3px
-    );
-  }
+  .scanlines { background-image: none; }
   .neon-divider {
-    background: linear-gradient(90deg, transparent, var(--teal), var(--blue), transparent);
+    background: var(--teal);
     height: 2px;
     width: 100%;
   }
